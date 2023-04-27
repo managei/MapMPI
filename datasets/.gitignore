@@ -1,0 +1,9 @@
+// here all local dataset files will be stored
+// we don't want to commit them to git
+// so we add this folder to .gitignore
+// and we add a .gitignore file to make sure the folder is not empty
+// ** DO NOT DELETE THIS FILE *
+
+*
+
+!.gitignore
