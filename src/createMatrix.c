@@ -10,6 +10,27 @@
 // TO RUN:
 // ./createMatrix 3
 
+void writeMatrixToFileIndexWise(int matrixSize, char *file, char name)
+{
+    int i,j,num=0;
+
+    printf("Writing to %s\n",file);
+    FILE * fp = fopen(file, "w+"); // open the file for reading
+
+    for(i=0;i<matrixSize;i++)
+    {
+        for(j=0;j<matrixSize;j++)
+        { 
+            num=rand() % 5;
+            fprintf(fp,"%c,%d,%d,%d \n", name,i,j,num);
+            // num++;
+        }
+        // fprintf(fp,"\n");
+    }
+    printf("Data written to %s\n",file);
+    fclose(fp);
+}
+
 void writeMatrixToFile(int matrixSize, char *file)
 {
     int i,j,num=0;

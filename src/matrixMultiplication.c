@@ -10,6 +10,30 @@
 // TO RUN: only the size of matrix : should already be created
 // ./matrixMultiplication 3
 
+// This method changes the custom format matrix to 2d-matrix
+void read_matrix_indexWise(char* filename, int rows, int cols, int **matrix, int matrixSize) {
+    // Open the file for reading
+   FILE* fp = fopen(filename, "r");
+
+    // Read the number of rows and columns
+    // fscanf(fp, "%d %d", &rows, &cols);
+    // printf("Rows: %d\nCols: %d\n",rows,cols);
+
+    // Read The matrix in this formate name,i,j,value
+    int i,j,value;
+    char name;
+    for(i=0;i<matrixSize;i++)
+    {
+        for(j=0;j<matrixSize;j++)
+        {
+            fscanf(fp, "%c,%d,%d,%d", &name,&i,&j,&value);
+            matrix[i][j] = value;
+        }
+    }
+    fclose(fp);
+
+}
+
 void read_matrix(char* filename, int rows, int cols, int **matrix, int matrixSize) {
     // Open the file for reading
    FILE* fp = fopen(filename, "r");
