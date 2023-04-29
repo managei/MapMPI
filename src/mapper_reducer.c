@@ -267,8 +267,8 @@ void printLines(char **lines, int lineCount)
 
 int main()
 {
-    char file1[50] = "../datasets/matrixA-"; // file1 path
-    char file2[50] = "../datasets/matrixB-"; // file2 path
+    char file1[50] = "../datasets/matrixA"; // file1 path
+    char file2[50] = "../datasets/matrixB"; // file2 path
 
     char *dummyKey = "dummy_key";      // dummy key to be sent to the map function
     int lineCount = countLines(file1); // counting the number of lines in the file
@@ -312,7 +312,7 @@ int main()
     char *mykey = "0,0";
     char *values[] = {"A,0,1", "B,0,2", "A,1,3", "B,1,4"};
     int num_values = 4;
-    reduce(mykey, values, num_values);
+    // reduce(mykey, values, num_values);
     // mapper receives the list of key-value pairs
     // make a dictionary for the received key-value pair
 
