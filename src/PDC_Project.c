@@ -1,5 +1,7 @@
-// to compile: mpicc PDC_Project.c -lm
-// to run: mpiexec -n 8 ./a.out
+// to compile: 
+// mpicc PDC_Project.c -lm
+// to run: MAKE SURE TO CREATE 3 SIZE MATRIX FIRST
+// mpiexec -n 8 ./a.out 3
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
@@ -7,11 +9,31 @@
 #include <math.h>
 #include <time.h>
 
+typedef struct
+{   
+    char name;
+    int i;
+    int j;
+    int value;
+} matrixIndex;
+
+// This method changes the custom format matrix to 2d-matrix
+void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int totalIndexes);
+
+// This method print matrix in index wise format 
+void printMatrixIndexWise(matrixIndex *matrix, int totalIndexes);
+
+// This method send data from master to mappers
+void send_data_to_mappers(matrixIndex *inputMatrixes,int totalIndexes, long long int  inputSplit, int remainingSplit,int mappers);
+
+// This method recieve data from master to mappers
+void recieve_data_from_master(matrixIndex *inputMatrixes,int* totalIndexes);
+
 // ftn to calculate number of mappers and reducers
 // returns sizeOfMatrix, mappers, reducers, inputSplit, equalDivisionPossible, remainingSplit
-void calculateNumberOfMappersAndReducers(long int sizeOfMatrix, int numberOfSlaves, int *mappers, int *reducers, long long int *inputSplit, int *equalDivisionPossible, int *remainingSplit)
+void calculateNumberOfMappersAndReducers(long long int totalElementsInMatrix, int numberOfSlaves, int *mappers, int *reducers, long long int *inputSplit, int *equalDivisionPossible, int *remainingSplit)
 {
-    long long int totalElementsInMatrix = sizeOfMatrix * sizeOfMatrix;
+    // long long int totalElementsInMatrix = sizeOfMatrix * sizeOfMatrix;
     int numberOfMappers = numberOfSlaves - 1;          // at least one slave is required for reducer
     int mod = totalElementsInMatrix % numberOfMappers; // see if equal division is possible
 
@@ -77,17 +99,48 @@ void main(int argc, char *argv[])
     int mappers = 0;  // number of mappers
     int reducers = 0; // number of reducers
     int equalDivisionPossible = 0;
+    matrixIndex* inputMatrixes;
+    matrixIndex* resultantMatrix;
+    long long int totalIndexes;
+    long long int inputSplit = 0;
+    int remainingSplit = 0;
 
     if (isMaster(rank)) // master node
     {
         printf("Master with running id %d running on %s\n", rank, processorName);
 
-        sizeOfMatrix = pow(2, rand() % 20 + 12); // assumed size of matrix
-        long long int inputSplit = 0;
-        int remainingSplit = 0;
-        calculateNumberOfMappersAndReducers(sizeOfMatrix, numberOfProcesses - 1, &mappers, &reducers, &inputSplit, &equalDivisionPossible, &remainingSplit);
+        int power = atoi(argv[1]); //maximum is 2^30
+        //randomly calculating matrix size
+        // int power = 3;//rand() % 12 + (30-12) ;
+        // sizeOfMatrix = pow(2, rand() % 20 + 12); // assumed size of matrix
+        printf("Power: %d\n",power);
+        int sizeOfMatrix = pow(2,power);
+        printf("Matrix Size: %d\n",sizeOfMatrix);
 
-        printf("Size of matrix: %lld\n", sizeOfMatrix);
+        // Read Matrix
+        char file1[] = "../datasets/matrixA";
+        char file2[] = "../datasets/matrixB";
+        
+        // list of MatrixIndex struct
+        // This is list of both input matrixes in index wise format
+        totalIndexes = sizeOfMatrix * sizeOfMatrix;
+        inputMatrixes = (matrixIndex*) malloc(sizeof(matrixIndex) * (totalIndexes * 2)) ;
+
+        // list of MatrixIndex struct
+        // This is list of resultant matrix in index wise format
+        resultantMatrix = (matrixIndex*) malloc(sizeof(matrixIndex) * totalIndexes);
+
+        // reading matrixes from files
+        // WARNING: MAKE SURE the FILES ARE ALREADY CREATED AND HAVE CORRECT DATA
+        read_matrix_indexWise(file1, file2, inputMatrixes, totalIndexes * 2);
+
+        // printMatrixIndexWise(inputMatrixes, totalIndexes * 2);
+
+        inputSplit = 0;
+        remainingSplit = 0;
+        calculateNumberOfMappersAndReducers(totalIndexes, numberOfProcesses - 1, &mappers, &reducers, &inputSplit, &equalDivisionPossible, &remainingSplit);
+
+        printf("Size of 2 matrixes: %lld\n", totalIndexes);
         printf("Number of mappers: %d\n", mappers);
         printf("Number of reducers: %d\n", reducers);
         printf("Input split: %lld\n", inputSplit);
@@ -106,15 +159,22 @@ void main(int argc, char *argv[])
     {
         // task distribution here
 
+        // It was done above and we have inputSplit and remainingSplit
+
         MPI_Barrier(MPI_COMM_WORLD); // task distribution completed
 
         // send data to mappers here use blocking send
+        printf("Sending data to mappers\n");
+        send_data_to_mappers(inputMatrixes, totalIndexes * 2, inputSplit, remainingSplit, mappers);
+        printf("Data Sent to mappers\n");
 
         MPI_Barrier(MPI_COMM_WORLD); // Mappers completed processing
 
-        // shuffle here and see what to do for synchronization
+        printf("Data Processed by ALL mappers\n");
 
-        // send data to reducers here use blocking send
+        // TODO: shuffle here and see what to do for synchronization
+
+        // TODO: send data to reducers here use blocking send
 
         MPI_Barrier(MPI_COMM_WORLD); // Reducers completed processing
     }
@@ -140,9 +200,18 @@ void main(int argc, char *argv[])
 
         // receive data from master here use blocking recieve
 
+        recieve_data_from_master(inputMatrixes, totalIndexes * 2);
         // loop for processing here
 
+        printf("Mapper with running id %d running on %s and mapper rank %d is processing data \n", rank, processorName, mapperRankInMapperComm);
+        // printf("From %lld to %lld\n", mapperRankInMapperComm * inputSplit, (mapperRankInMapperComm + 1) * inputSplit - 1);
+
+        // TODO: here map will be called
+
         MPI_Barrier(MPI_COMM_WORLD); // all mappers completed processing it is ok to shuffle
+
+        // TODO: here key value pairs will be sent to reducers or master
+
         MPI_Barrier(MPI_COMM_WORLD); // allow reducers to complete processing
     }
     else if (isReducer(rank, mappers)) // reducer node code
@@ -167,12 +236,105 @@ void main(int argc, char *argv[])
 
         printf("Reducer with running id %d running on %s and reducer rank %d\n", rank, processorName, reducerRankInReducerComm);
 
-        // receive data from master here use blocking recieve
+        // TODO: receive data from master here use blocking recieve
 
-        // loop for processing here
+        // TODO: loop for processing here
 
         MPI_Barrier(MPI_COMM_WORLD); // all reducers completed processing
     }
 
     MPI_Finalize(); // finalize MPI environment
+}
+void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int totalIndexes) {
+
+    // Open the matrix A file for reading
+   FILE* fp = fopen(filename1, "r");
+
+    // Read The matrix in this formate name,i,j,value
+    int a,b,value;
+    char name;
+    int i=0;
+    for(i=0;i<totalIndexes/2;i++)
+    {
+        fscanf(fp, "%c,%d,%d,%d\n", &name,&a,&b,&value);
+
+        matrix[i].name = name;
+        matrix[i].i = a;
+        matrix[i].j = b;
+        matrix[i].value = value;
+
+    }
+    fclose(fp);
+
+    // Open the matrix B file for reading
+    fp = fopen(filename2, "r");
+
+    // Read The matrix in this formate name,i,j,value
+    for( ;i<totalIndexes;i++)
+    {
+        fscanf(fp, "%c,%d,%d,%d\n", &name,&a,&b,&value);
+
+        matrix[i].name = name;
+        matrix[i].i = a;
+        matrix[i].j = b;
+        matrix[i].value = value;
+    }
+    fclose(fp);
+
+}
+
+void printMatrixIndexWise(matrixIndex *matrix, int totalIndexes)
+{
+    int i,j;
+    for(i=0;i<totalIndexes;i++)
+    {
+        printf("%c,%d,%d,%d", matrix[i].name, matrix[i].i, matrix[i].j, matrix[i].value);
+        printf("\n");
+    }
+}
+
+void send_data_to_mappers(matrixIndex *inputMatrixes,int totalIndexes, long long int  inputSplit, int remainingSplit, int mappers)
+{
+    // for all process select mappers and send data to them 
+    int i;
+    for(i=1;i<=mappers;i++)
+    {
+        int mapperRank = i;
+        int mapperIndex = mapperRank - 1;
+
+        // compute start and end index for mapper
+        int mapperStartIndex = mapperIndex * inputSplit;
+        int mapperEndIndex = mapperStartIndex + inputSplit - 1;
+
+        // if last mapper then add remaining split
+        if(mapperRank == mappers-1)
+        {
+            mapperEndIndex += remainingSplit;
+        }
+        // compute data size
+        int mapperDataSize = (mapperEndIndex - mapperStartIndex + 1) * sizeof(matrixIndex);
+        // send data size
+        MPI_Send(&mapperDataSize, 1, MPI_INT, mapperRank, 0, MPI_COMM_WORLD);
+        // send data
+        MPI_Send(&inputMatrixes[mapperStartIndex], mapperDataSize, MPI_BYTE, mapperRank, 0, MPI_COMM_WORLD);
+    }
+}
+void recieve_data_from_mappers(matrixIndex *inputMatrixes,int totalIndexes, long long int  inputSplit, int remainingSplit, int mappers)
+{
+    
+}
+void recieve_data_from_master(matrixIndex *inputMatrixes,int* totalIndexes)
+{
+
+    int totalDataSize = 0;
+    // wait for data Size from master
+    MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    
+    totalIndexes = totalDataSize / sizeof(matrixIndex);
+
+    // Allocate memory for input matrixes
+    inputMatrixes = (matrixIndex *)malloc(totalDataSize);
+
+    // wait for data from master
+    MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 }
