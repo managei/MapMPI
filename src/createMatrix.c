@@ -86,14 +86,14 @@ int main(int argc, char* argv[]) {
 
     // now we will create a file
     // append datasets directory to file name in front 
-    char file1[] = "../datasets/matrixA-";
-    char file2[] = "../datasets/matrixB-";
+    char file1[] = "../datasets/matrixA";
+    char file2[] = "../datasets/matrixB";
 
     // strncat(filename, &power, powerSize);
-    char powerStr[10];
-    sprintf(powerStr, "%d", power);
-    strncat(file1, powerStr, strlen(powerStr));
-    strncat(file2, powerStr, strlen(powerStr));
+    // char powerStr[10];
+    // sprintf(powerStr, "%d", power);
+    // strncat(file1, powerStr, strlen(powerStr));
+    // strncat(file2, powerStr, strlen(powerStr));
     
     // char *file1 = argv[2];
     // char *file2 = argv[3];
@@ -101,8 +101,8 @@ int main(int argc, char* argv[]) {
     printf("File 1 name: %s\n",file1);
     printf("File 2 name: %s\n",file2);
 
-    writeMatrixToFile(matrixSize,file1);
-    writeMatrixToFile(matrixSize,file2);
+    writeMatrixToFileIndexWise(matrixSize,file1,'A');
+    writeMatrixToFileIndexWise(matrixSize,file2,'B');
 
     return 0;
 }

@@ -107,14 +107,13 @@ int main(int argc, char* argv[]) {
 
 
     // append datasets directory to file name in front 
-    char file1[] = "../datasets/matrixA-";
-    char file2[] = "../datasets/matrixB-";
+    char file1[] = "../datasets/matrixA";
+    char file2[] = "../datasets/matrixB";
 
-    // strncat(filename, &power, powerSize);
-    char powerStr[10];
-    sprintf(powerStr, "%d", power);
-    strncat(file1, powerStr, strlen(powerStr));
-    strncat(file2, powerStr, strlen(powerStr));
+    // char powerStr[10];
+    // sprintf(powerStr, "%d", power);
+    // strncat(file1, powerStr, strlen(powerStr));
+    // strncat(file2, powerStr, strlen(powerStr));
 
     int** matA = (int**) calloc(matrixSize, sizeof(int*));
     int** matB = (int**) calloc(matrixSize, sizeof(int*));
