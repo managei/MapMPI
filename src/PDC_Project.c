@@ -38,6 +38,22 @@ void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long in
 // This method recieve data from master to mappers
 long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
 
+// This method recieves data from mappers to Master
+// TODO: The recieve data is not working properly
+// The data size is not being recieved properly
+void recieve_data_from_mappers(HashTable **hashTables, int mappers);
+
+// This method sends data from mappers to Master
+void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize);
+
+// This method recieves data from Master to mapper (NOT BEING USED : Using inline code in mapper)
+long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
+
+// This is map function for mapper
+// takes in input the matrix index
+// and returns hastTable
+void map(matrixIndex input, HashTable *hash, int sizeOfMatrix);
+
 // ftn to calculate number of mappers and reducers
 // returns sizeOfMatrix, mappers, reducers, inputSplit, equalDivisionPossible, remainingSplit
 void calculateNumberOfMappersAndReducers(long long int totalElementsInMatrix, int numberOfSlaves, int *mappers, int *reducers, long long int *inputSplit, int *equalDivisionPossible, int *remainingSplit)
@@ -405,6 +421,7 @@ void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize)
     // send data
     MPI_Send(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
 }
+
 long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize)
 {
 
