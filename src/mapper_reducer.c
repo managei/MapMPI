@@ -5,6 +5,12 @@
 #include <string.h>
 #include <stdbool.h>
 
+// TO COMPILE: 
+// gcc mapper_reducer.c -lm -o mapper_reducer
+
+// TO RUN:
+// ./mapper_reducer
+
 // input to mapper
 // MatrixType,Row,Column,Value
 // convert into string
@@ -315,7 +321,7 @@ int main()
     char *mykey = "0,0";
     char *values[] = {"A,0,0,1", "B,0,0,2", "A,0,1,3", "B,1,0,4"};
     int num_values = 4;
-    // reduce(mykey, values, num_values);
+    reduce(mykey, values, num_values);
     // mapper receives the list of key-value pairs
     // make a dictionary for the received key-value pair
 
