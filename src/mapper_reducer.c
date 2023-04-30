@@ -112,60 +112,62 @@ void map(char *key, char *value)
     }
 }
 
-/*
 void reduce(char *key, char **values, int num_values)
 {
     // Multiply and accumulate the corresponding entries from input matrices A and B
-    printf("Reached here0\n");
+    // printf("Reached here0\n");
     int A[num_values];
     int B[num_values];
-    printf("Reached here1\n");
+    // printf("Reached here1\n");
     for (int i = 0; i < num_values; i++)
     {
-        printf("Printing in loop %d\n", i);
-        char *value = values[i];
+        // printf("Printing in loop %d\n", i);
+        char *value = strdup(values[i]);
         printf("Value: %s\n", value);
         char *valueSplit[MAX_LINE_LEN];
-        printf("Reached here in loop 10\n");
         int num_splits = 0;
-        valueSplit[num_splits] = strtok(value, ",");
-        num_splits++;
-        printf("ValueSplit %s\n", valueSplit[0]);
-        printf("Reached here in loop 11\n");
-        while (num_splits < 3 && (valueSplit[num_splits++] = strtok(NULL, ",")))
+        // printf("Reached here in loop 10\n");
+        valueSplit[num_splits++] = strtok(value, ",");
+        // printf("Reached here in loop 11\n");
+        while (num_splits < 4 && (valueSplit[num_splits++] = strtok(NULL, ",")))
             ;
-        int index = atoi(valueSplit[1]);
-        int val = atoi(valueSplit[2]);
-        printf("Reached here in loop 12\n");
+        printf("%s,%s,%s,%s\n", valueSplit[0], valueSplit[1], valueSplit[2], valueSplit[3]);
+        int index = atoi(valueSplit[1]) + atoi(valueSplit[2]);
+        int val = atoi(valueSplit[3]);
+        // printf("Reached here in loop 12\n");
         if (strcmp(valueSplit[0], "A") == 0)
         {
             A[index] = val;
+            printf("A[%d]-> %d\n", index, A[index]);
         }
         else
         {
             B[index] = val;
+            printf("B[%d]-> %d\n", index, B[index]);
         }
-        printf("Printing in loop %d\n", i);
     }
-    printf("Reached here2\n");
+    // printf("Reached here2\n");
     int dotProduct = 0;
     for (int i = 0; i < globalN; i++)
     {
         dotProduct += A[i] * B[i];
     }
-    printf("Reached here3\n");
-    // Emit output key-value pairs
+    // printf("Reached here3\n");
+    //  Emit output key-value pairs
     char *keySplit[MAX_LINE_LEN];
     int num_splits = 0;
-    keySplit[num_splits++] = strtok(key, ",");
+    // printf("Reached here4\n");
+    char key_copy[MAX_LINE_LEN];
+    strcpy(key_copy, key);
+    keySplit[num_splits++] = strtok(key_copy, ",");
+    // printf("Reached here5\n");
     while (num_splits < 2 && (keySplit[num_splits++] = strtok(NULL, ",")))
         ;
     int row = atoi(keySplit[0]);
     int col = atoi(keySplit[1]);
     printf("%d,%d,%d\n", row, col, dotProduct);
-    printf("Reached here4\n");
+    // printf("Reached here6\n");
 }
-*/
 
 /*
 void reduce(char* key, char** values, int num_values) {
@@ -309,8 +311,9 @@ int main()
     // }
 
     printf("Calling reducer\n");
+    printf("Matrix,row index,col index,value\n");
     char *mykey = "0,0";
-    char *values[] = {"A,0,1", "B,0,2", "A,1,3", "B,1,4"};
+    char *values[] = {"A,0,0,1", "B,0,0,2", "A,0,1,3", "B,1,0,4"};
     int num_values = 4;
     // reduce(mykey, values, num_values);
     // mapper receives the list of key-value pairs
