@@ -1,4 +1,4 @@
-// to compile: 
+// to compile:
 // mpicc PDC_Project.c -lm
 // to run: MAKE SURE TO CREATE 3 SIZE MATRIX FIRST
 // mpiexec -n 8 ./a.out 3
@@ -10,30 +10,27 @@
 #include <time.h>
 #include "hashmap.h"
 
-
 #define MAX_LINE_LEN 1024
 #define MAX_LINES 100
 #define MAX_LINE_LENGTH 100
 
 typedef struct
-{   
-    char* key;
+{
+    char *key;
     char name;
     int i;
     int j;
     int value;
 } matrixIndex;
 
-
-
 // This method changes the custom format matrix to 2d-matrix
-void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int inputSize);
+void read_matrix_indexWise(char *filename1, char *filename2, matrixIndex *matrix, int inputSize);
 
-// This method print matrix in index wise format 
+// This method print matrix in index wise format
 void printMatrixIndexWise(matrixIndex *matrix, long long int inputSize);
 
 // This method send data from master to mappers
-void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long int  inputSplit, int remainingSplit,int mappers);
+void send_data_to_mappers(matrixIndex *inputMatrixes, int inputSize, long long int inputSplit, int remainingSplit, int mappers);
 
 // This method recieve data from master to mappers
 long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
@@ -44,7 +41,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
 void recieve_data_from_mappers(HashTable **hashTables, int mappers);
 
 // This method sends data from mappers to Master
-void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize);
+void send_data_to_master(matrixIndex *inputMatrixes, long long int inputSize);
 
 // This method recieves data from Master to mapper (NOT BEING USED : Using inline code in mapper)
 long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
@@ -124,8 +121,8 @@ void main(int argc, char *argv[])
     int mappers = 0;  // number of mappers
     int reducers = 0; // number of reducers
     int equalDivisionPossible = 0;
-    matrixIndex* inputMatrixes;
-    matrixIndex* resultantMatrix;
+    matrixIndex *inputMatrixes;
+    matrixIndex *resultantMatrix;
     long long int inputSize;
     long long int inputSplit = 0;
     int remainingSplit = 0;
@@ -134,26 +131,26 @@ void main(int argc, char *argv[])
     {
         printf("Master with running id %d running on %s\n", rank, processorName);
 
-        int power = atoi(argv[1]); //maximum is 2^30
-        //randomly calculating matrix size
-        // int power = 3;//rand() % 12 + (30-12) ;
-        // sizeOfMatrix = pow(2, rand() % 20 + 12); // assumed size of matrix
-        printf("Power: %d\n",power);
-        sizeOfMatrix = pow(2,power);
-        printf("Matrix Size: %d\n",sizeOfMatrix);
+        int power = atoi(argv[1]); // maximum is 2^30
+        // randomly calculating matrix size
+        //  int power = 3;//rand() % 12 + (30-12) ;
+        //  sizeOfMatrix = pow(2, rand() % 20 + 12); // assumed size of matrix
+        printf("Power: %d\n", power);
+        sizeOfMatrix = pow(2, power);
+        printf("Matrix Size: %d\n", sizeOfMatrix);
 
         // Read Matrix
         char file1[] = "../datasets/matrixA";
         char file2[] = "../datasets/matrixB";
-        
+
         // list of MatrixIndex struct
         // This is list of both input matrixes in index wise format
         inputSize = sizeOfMatrix * sizeOfMatrix;
-        inputMatrixes = (matrixIndex*) malloc(sizeof(matrixIndex) * (inputSize * 2)) ;
+        inputMatrixes = (matrixIndex *)malloc(sizeof(matrixIndex) * (inputSize * 2));
 
         // list of MatrixIndex struct
         // This is list of resultant matrix in index wise format
-        resultantMatrix = (matrixIndex*) malloc(sizeof(matrixIndex) * inputSize);
+        resultantMatrix = (matrixIndex *)malloc(sizeof(matrixIndex) * inputSize);
 
         // reading matrixes from files
         // WARNING: MAKE SURE the FILES ARE ALREADY CREATED AND HAVE CORRECT DATA
@@ -180,7 +177,7 @@ void main(int argc, char *argv[])
 
     MPI_Group MPI_GROUP_WORLD;
     MPI_Comm_group(MPI_COMM_WORLD, &MPI_GROUP_WORLD); // fetch group from MPI_COMM_WORLD
-    MPI_Comm MPI_COMM_MAPPER;    // mapper communicator
+    MPI_Comm MPI_COMM_MAPPER;                         // mapper communicator
     MPI_Group MPI_GROUP_MAPPER;
     if (isMaster(rank))
     {
@@ -196,12 +193,12 @@ void main(int argc, char *argv[])
 
         MPI_Barrier(MPI_COMM_WORLD); // Mappers completed processing
 
-        HashTable **localMapperHash = (HashTable *)malloc(sizeof(HashTable) * mappers);
+        // ! HashTable **localMapperHash = (HashTable *)malloc(sizeof(HashTable) * mappers);
 
         // TODO: shuffle here and see what to do for synchronization
-        recieve_data_from_mappers(&localMapperHash, mappers);
+        // ! recieve_data_from_mappers(&localMapperHash, mappers);
 
-        printf("Data Gathered by ALL mappers to Master\n");
+        //! printf("Data Gathered by ALL mappers to Master\n");
 
         // printMatrixIndexWise(inputMatrixes, inputSize * 2);
 
@@ -212,7 +209,7 @@ void main(int argc, char *argv[])
     else if (isMapper(rank, mappers)) // mapper node code
     {
         MPI_Barrier(MPI_COMM_WORLD); // wait for task distribution
-        
+
         int mapperRankInMapperComm = 0; // rank of mapper in mapper communicator
         int mapperRanks[mappers];
 
@@ -233,7 +230,7 @@ void main(int argc, char *argv[])
         int totalDataSize = 0;
         // wait for data Size from master
         MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
+
         inputSize = totalDataSize / sizeof(matrixIndex);
 
         // Allocate memory for input matrixes
@@ -252,34 +249,32 @@ void main(int argc, char *argv[])
         // still needs to save keys
         // printf("Size of Matrix: %lld\n", sizeOfMatrix);
         // printf("Size of recieved matrixes: %lld\n", inputSize);
-        for(int i = 0 ; i< inputSize; i++)
+        for (int i = 0; i < inputSize; i++)
         {
-            map(inputMatrixes[i], &localMapperHash, sizeOfMatrix);
+            map(inputMatrixes[i], localMapperHash, sizeOfMatrix);
         }
 
         MPI_Barrier(MPI_COMM_WORLD); // all mappers completed processing it is ok to shuffle
 
         // TODO: here key value pairs will be sent to reducers or master
         // send data
-        // print_table(localMapperHash);
+        print_table(localMapperHash);
         // printf("Data Sent by Mapper %d\n", rank);
         // printf("Data Pointer %p\n", localMapperHash);
 
-        // send data size to master
-        int size = calculate_size_of_ht(localMapperHash);
-        printf("Sending data Size : %d to master by Mapper %d\n", size, rank);
+        //! send data size to master
+        // int size = calculate_size_of_ht(localMapperHash);
+        // printf("Sending data Size : %d to master by Mapper %d\n", size, rank);
 
-        MPI_Send(&size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-        
-        printf("Sending data to master by Mapper %d\n", rank);
+        // MPI_Send(&size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
 
-        char* buffer = (char*) malloc(size);
-        serialize_ht(buffer, localMapperHash);
-        MPI_Send(buffer, size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
+        // printf("Sending data to master by Mapper %d\n", rank);
 
+        // char *buffer = (char *)malloc(size);
+        // serialize_ht(buffer, localMapperHash);
+        // MPI_Send(buffer, size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
 
         MPI_Barrier(MPI_COMM_WORLD); // allow reducers to complete processing
-
     }
     else if (isReducer(rank, mappers)) // reducer node code
     {
@@ -307,30 +302,28 @@ void main(int argc, char *argv[])
         // TODO: receive data from master here use blocking recieve
 
         // TODO: loop for processing here
-
-
     }
 
     MPI_Finalize(); // finalize MPI environment
 }
-void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int inputSize) {
+void read_matrix_indexWise(char *filename1, char *filename2, matrixIndex *matrix, int inputSize)
+{
 
     // Open the matrix A file for reading
-   FILE* fp = fopen(filename1, "r");
+    FILE *fp = fopen(filename1, "r");
 
     // Read The matrix in this formate name,i,j,value
-    int a,b,value;
+    int a, b, value;
     char name;
-    int i=0;
-    for(i=0;i<inputSize/2;i++)
+    int i = 0;
+    for (i = 0; i < inputSize / 2; i++)
     {
-        fscanf(fp, "%c,%d,%d,%d\n", &name,&a,&b,&value);
+        fscanf(fp, "%c,%d,%d,%d\n", &name, &a, &b, &value);
 
         matrix[i].name = name;
         matrix[i].i = a;
         matrix[i].j = b;
         matrix[i].value = value;
-
     }
     fclose(fp);
 
@@ -338,9 +331,9 @@ void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix
     fp = fopen(filename2, "r");
 
     // Read The matrix in this formate name,i,j,value
-    for( ;i<inputSize;i++)
+    for (; i < inputSize; i++)
     {
-        fscanf(fp, "%c,%d,%d,%d\n", &name,&a,&b,&value);
+        fscanf(fp, "%c,%d,%d,%d\n", &name, &a, &b, &value);
 
         matrix[i].name = name;
         matrix[i].i = a;
@@ -348,24 +341,23 @@ void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix
         matrix[i].value = value;
     }
     fclose(fp);
-
 }
 
 void printMatrixIndexWise(matrixIndex *matrix, long long int inputSize)
 {
-    int i,j;
-    for(i=0;i<inputSize;i++)
+    int i, j;
+    for (i = 0; i < inputSize; i++)
     {
         printf("%c,%d,%d,%d", matrix[i].name, matrix[i].i, matrix[i].j, matrix[i].value);
         printf("\n");
     }
 }
 
-void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long int  inputSplit, int remainingSplit, int mappers)
+void send_data_to_mappers(matrixIndex *inputMatrixes, int inputSize, long long int inputSplit, int remainingSplit, int mappers)
 {
-    // for all process select mappers and send data to them 
+    // for all process select mappers and send data to them
     int i;
-    for(i=1;i<=mappers;i++)
+    for (i = 1; i <= mappers; i++)
     {
         int mapperRank = i;
         int mapperIndex = mapperRank - 1;
@@ -375,7 +367,7 @@ void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long in
         int mapperEndIndex = mapperStartIndex + inputSplit - 1;
 
         // if last mapper then add remaining split
-        if(mapperRank == mappers-1)
+        if (mapperRank == mappers - 1)
         {
             mapperEndIndex += remainingSplit;
         }
@@ -389,9 +381,9 @@ void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long in
 }
 void recieve_data_from_mappers(HashTable **hashTables, int mappers)
 {
-    // for all process select mappers and send data to them 
+    // for all process select mappers and send data to them
     int i;
-    for(i=1;i<=mappers;i++)
+    for (i = 1; i <= mappers; i++)
     {
         int mapperRank = i;
         int mapperIndex = mapperRank - 1;
@@ -399,10 +391,10 @@ void recieve_data_from_mappers(HashTable **hashTables, int mappers)
         // get data size for mapper
         int size;
         MPI_Recv(&size, 1, MPI_INT, mapperRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        
+
         printf("Recieving data Size : %d from mapper %d\n", size, mapperRank);
-        char* buffer = (char*) malloc(size);
-        
+        char *buffer = (char *)malloc(size);
+
         printf("Recieving data from mapper %d\n", mapperRank);
         MPI_Recv(buffer, size, MPI_BYTE, mapperRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         HashTable ht;
@@ -410,12 +402,11 @@ void recieve_data_from_mappers(HashTable **hashTables, int mappers)
         deserialize_ht(buffer, &ht);
 
         print_table(&ht);
-        
+
         hashTables[mapperIndex] = &ht;
     }
-    
 }
-void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize)
+void send_data_to_master(matrixIndex *inputMatrixes, long long int inputSize)
 {
     int totalDataSize = inputSize * sizeof(matrixIndex);
     // send data
@@ -428,7 +419,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
     int totalDataSize = 0;
     // wait for data Size from master
     MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    
+
     inputSize = totalDataSize / sizeof(matrixIndex);
 
     // Allocate memory for input matrixes
@@ -436,7 +427,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
 
     // wait for data from master
     MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    
+
     // printf("Recieved data from master\n");
     // printf("Data Size %d\n", totalDataSize);
 
@@ -444,7 +435,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
 }
 
 void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
-{   
+{
     char *inputSplit[MAX_LINE_LEN];
     char *outputKey[MAX_LINE_LEN];
     char *outputValue[MAX_LINE_LEN];
@@ -467,7 +458,7 @@ void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
     val = input.value;
 
     // Emit intermediate key-value pairs
-    if (matrixType =='A')
+    if (matrixType == 'A')
     {
         // printf("Matrix A detected\n");
         // printf("Key\tValue\n");
