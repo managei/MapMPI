@@ -17,14 +17,13 @@
 
 typedef struct
 {   
-    char* key;
+    int keyI;
+    int keyJ;
     char name;
     int i;
     int j;
     int value;
 } matrixIndex;
-
-
 
 // This method changes the custom format matrix to 2d-matrix
 void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int inputSize);
@@ -41,7 +40,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
 // This method recieves data from mappers to Master
 // TODO: The recieve data is not working properly
 // The data size is not being recieved properly
-void recieve_data_from_mappers(HashTable **hashTables, int mappers);
+void recieve_data_from_mappers(matrixIndex *allKeys, int mappers, int size);
 
 // This method sends data from mappers to Master
 void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize);
@@ -49,10 +48,18 @@ void send_data_to_master(matrixIndex *inputMatrixes,long long int inputSize);
 // This method recieves data from Master to mapper (NOT BEING USED : Using inline code in mapper)
 long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
 
+// This method compares two matrixIndex struct
+int compareByKeys(const void *a, const void *b);
+
 // This is map function for mapper
 // takes in input the matrix index
-// and returns hastTable
-void map(matrixIndex input, HashTable *hash, int sizeOfMatrix);
+// and returns list of keys
+void map(matrixIndex input, matrixIndex *keysList, int index, int sizeOfMatrix);
+
+// This is reduce function for reducer
+// takes in input the matrix index
+// and returns resultant matrix 
+void reduce(matrixIndex* input, int inputSize, int index,int *resultant, int matrixSize);
 
 // ftn to calculate number of mappers and reducers
 // returns sizeOfMatrix, mappers, reducers, inputSplit, equalDivisionPossible, remainingSplit
@@ -196,18 +203,31 @@ void main(int argc, char *argv[])
 
         MPI_Barrier(MPI_COMM_WORLD); // Mappers completed processing
 
-        HashTable **localMapperHash = (HashTable *)malloc(sizeof(HashTable) * mappers);
+        int sizeOfKeys = inputSplit * sizeOfMatrix;
+        // printf("Size of keys: %d\n", sizeOfKeys);
+        matrixIndex *allKeys = (matrixIndex *)malloc(sizeof(matrixIndex) * mappers * sizeOfKeys);
 
-        // TODO: shuffle here and see what to do for synchronization
-        recieve_data_from_mappers(&localMapperHash, mappers);
+        recieve_data_from_mappers(allKeys, mappers, sizeOfKeys);
+        printf("Reieved keys from mappers to Master\n");
 
-        printf("Data Gathered by ALL mappers to Master\n");
-
-        // printMatrixIndexWise(inputMatrixes, inputSize * 2);
+        qsort(allKeys, mappers * sizeOfKeys, sizeof(matrixIndex), compareByKeys);
+        printf("Sorted keys by Master\n");
 
         // TODO: send data to reducers here use blocking send
-
         MPI_Barrier(MPI_COMM_WORLD); // Reducers completed processing
+
+        // printf("Total Keys: %d\n", mappers * sizeOfKeys);
+        // printf("Total Reducers: %d\n", reducers);
+        // printf("Total Keys per reducer: %d\n", mappers * sizeOfKeys / reducers);
+        // All similar keys are together
+        // So we can divide the keys equally among reducers
+        // We can send the keys to reducers in round robin fashion
+        
+        // for (int i = 0; i < reducers; i++)
+        // {
+        //     printf("Sending data to reducer %d\n", i + 1);
+        //     send_data_to_reducers(allKeys, i, mappers, reducers, sizeOfKeys);
+        // }
     }
     else if (isMapper(rank, mappers)) // mapper node code
     {
@@ -229,7 +249,6 @@ void main(int argc, char *argv[])
         printf("Mapper with running id %d running on %s and mapper rank %d\n", rank, processorName, mapperRankInMapperComm);
 
         // receive data from master here use blocking recieve
-
         int totalDataSize = 0;
         // wait for data Size from master
         MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -242,41 +261,21 @@ void main(int argc, char *argv[])
         // wait for data from master
         MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        // loop for processing here
         // generate key pairs
-        HashTable *localMapperHash = (HashTable *)malloc(sizeof(HashTable));
+        int totalKeys = inputSize * sizeOfMatrix;
+        // printf("Total keys: %d\n", totalKeys);
+        matrixIndex* localKeys = (matrixIndex*) malloc(sizeof(matrixIndex) * totalKeys);
 
-        create_table(localMapperHash);
-
-        // TODO: here map will be called
-        // still needs to save keys
-        // printf("Size of Matrix: %lld\n", sizeOfMatrix);
-        // printf("Size of recieved matrixes: %lld\n", inputSize);
-        for(int i = 0 ; i< inputSize; i++)
+        // loop for processing here
+        for(int i = 0 ; i < inputSize; i++)
         {
-            map(inputMatrixes[i], &localMapperHash, sizeOfMatrix);
+            map(inputMatrixes[i], localKeys, i, sizeOfMatrix);
         }
 
         MPI_Barrier(MPI_COMM_WORLD); // all mappers completed processing it is ok to shuffle
 
-        // TODO: here key value pairs will be sent to reducers or master
-        // send data
-        // print_table(localMapperHash);
-        // printf("Data Sent by Mapper %d\n", rank);
-        // printf("Data Pointer %p\n", localMapperHash);
-
         // send data size to master
-        int size = calculate_size_of_ht(localMapperHash);
-        printf("Sending data Size : %d to master by Mapper %d\n", size, rank);
-
-        MPI_Send(&size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
-        
-        printf("Sending data to master by Mapper %d\n", rank);
-
-        char* buffer = (char*) malloc(size);
-        serialize_ht(buffer, localMapperHash);
-        MPI_Send(buffer, size, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-
+        MPI_Send(localKeys, sizeof(matrixIndex) * totalKeys, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
 
         MPI_Barrier(MPI_COMM_WORLD); // allow reducers to complete processing
 
@@ -304,15 +303,69 @@ void main(int argc, char *argv[])
 
         printf("Reducer with running id %d running on %s and reducer rank %d\n", rank, processorName, reducerRankInReducerComm);
 
-        // TODO: receive data from master here use blocking recieve
+        // receive data from master here use blocking recieve
+        int totalDataSize = 0;
+        // wait for data Size from master
+        MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        inputSize = totalDataSize / sizeof(matrixIndex);
+
+        // Allocate memory for input matrixes
+        inputMatrixes = (matrixIndex *)malloc(totalDataSize);
+
+        // wait for data from master
+        MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        // print recieved data
+        // printMatrixIndexWise(inputMatrixes, inputSize);
+
+        // result matrix
+        // int *resultant = (int *)malloc(sizeof(int) * sizeOfMatrix * sizeOfMatrix);
 
         // TODO: loop for processing here
+        // printf("Total input matrixes: %d\n", inputSize);
+        // printf("size of matrix: %d\n", sizeOfMatrix);
+        // printf("Values per Key: %d\n", sizeOfMatrix * sizeOfMatrix);
+
+        // HashTable *hashTable = (struct HashTable *)malloc(sizeof(struct HashTable) * inputSize);
+
+        // create_table(hashTable, inputSize);
+
+        // for (int i = 0; i < inputSize; i++)
+        // {
+        //     insert(hashTable,i, inputMatrixes[i].value);
+        // }
+
+        // print_table(hashTable, inputSize);
 
 
+        
     }
 
     MPI_Finalize(); // finalize MPI environment
 }
+// compare by keys
+int compareByKeys(const void *a, const void *b)
+{
+    matrixIndex *matrixIndexA = (matrixIndex *)a;
+    matrixIndex *matrixIndexB = (matrixIndex *)b;
+
+    // sort by both keys in ascending order
+    if (matrixIndexA->keyI > matrixIndexB->keyI)
+        return 1;
+    else if (matrixIndexA->keyI < matrixIndexB->keyI)
+        return -1;
+    else
+    {
+        if (matrixIndexA->keyJ > matrixIndexB->keyJ)
+            return 1;
+        else if (matrixIndexA->keyJ < matrixIndexB->keyJ)
+            return -1;
+        else
+            return 0;
+    }
+}
+
 void read_matrix_indexWise(char* filename1, char* filename2, matrixIndex *matrix, int inputSize) {
 
     // Open the matrix A file for reading
@@ -356,11 +409,33 @@ void printMatrixIndexWise(matrixIndex *matrix, long long int inputSize)
     int i,j;
     for(i=0;i<inputSize;i++)
     {
-        printf("%c,%d,%d,%d", matrix[i].name, matrix[i].i, matrix[i].j, matrix[i].value);
+        printf("%d,%d: %c %d,%d %d \n", matrix[i].keyI, matrix[i].keyJ, matrix[i].name, matrix[i].i, matrix[i].j, matrix[i].value);
         printf("\n");
     }
 }
 
+void send_data_to_reducers(matrixIndex *inputMatrixes, int inputSize, int mappers, int reducers, int sizeOfMatrix)
+{
+    // for all process select reducers and send data to them 
+    int i;
+    for(i=1;i<=reducers;i++)
+    {
+        int reducerRank = i + mappers;
+        int reducerIndex = reducerRank - mappers - 1;
+
+        // compute start and end index for reducer
+        int reducerStartIndex = reducerIndex * sizeOfMatrix;
+        int reducerEndIndex = reducerStartIndex + sizeOfMatrix - 1;
+
+        // compute data size
+        int reducerDataSize = (reducerEndIndex - reducerStartIndex + 1) * sizeof(matrixIndex);
+        // send data size
+        MPI_Send(&reducerDataSize, 1, MPI_INT, reducerRank, 0, MPI_COMM_WORLD);
+        // send data
+        MPI_Send(inputMatrixes + reducerStartIndex, reducerDataSize, MPI_BYTE, reducerRank, 0, MPI_COMM_WORLD);
+    }
+    
+}
 void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long int  inputSplit, int remainingSplit, int mappers)
 {
     // for all process select mappers and send data to them 
@@ -387,7 +462,7 @@ void send_data_to_mappers(matrixIndex *inputMatrixes,int inputSize, long long in
         MPI_Send(&inputMatrixes[mapperStartIndex], mapperDataSize, MPI_BYTE, mapperRank, 0, MPI_COMM_WORLD);
     }
 }
-void recieve_data_from_mappers(HashTable **hashTables, int mappers)
+void recieve_data_from_mappers(matrixIndex *allKeys, int mappers, int size)
 {
     // for all process select mappers and send data to them 
     int i;
@@ -395,23 +470,20 @@ void recieve_data_from_mappers(HashTable **hashTables, int mappers)
     {
         int mapperRank = i;
         int mapperIndex = mapperRank - 1;
-
-        // get data size for mapper
-        int size;
-        MPI_Recv(&size, 1, MPI_INT, mapperRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
-        printf("Recieving data Size : %d from mapper %d\n", size, mapperRank);
-        char* buffer = (char*) malloc(size);
+        matrixIndex* buffer = (matrixIndex*) malloc(sizeof(matrixIndex) * size);
         
         printf("Recieving data from mapper %d\n", mapperRank);
-        MPI_Recv(buffer, size, MPI_BYTE, mapperRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        HashTable ht;
-        create_table(&ht);
-        deserialize_ht(buffer, &ht);
-
-        print_table(&ht);
+        MPI_Recv(buffer, sizeof(matrixIndex) * size, MPI_BYTE, mapperRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         
-        hashTables[mapperIndex] = &ht;
+        // printMatrixIndexWise(buffer, size);
+
+        int j;
+        for(j=0;j<size;j++)
+        {
+            allKeys[mapperIndex * size + j] = buffer[j];
+        }
+
     }
     
 }
@@ -443,7 +515,7 @@ long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int
     return inputSize;
 }
 
-void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
+void map(matrixIndex input, matrixIndex *keysList,int index, int sizeOfMatrix)
 {   
     char *inputSplit[MAX_LINE_LEN];
     char *outputKey[MAX_LINE_LEN];
@@ -451,16 +523,7 @@ void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
     char matrixType;
     int row, col, val, k, i, N = sizeOfMatrix;
 
-    // WE DONT NEED TO SPLIT THE INPUT AS WE ARE USING (STRUCTURE)
-    // Parse input matrix A or B
-    // int num_splits = 0;
-    // inputSplit[num_splits++] = strtok(value, ",");
-    // while (num_splits < 4 && (inputSplit[num_splits++] = strtok(NULL, ",")))
-    //     ;
-    // matrixType = inputSplit[0];
-    // row = atoi(inputSplit[1]);
-    // col = atoi(inputSplit[2]);
-    // val = atoi(inputSplit[3]);
+    // Get values
     matrixType = input.name;
     row = input.i;
     col = input.j;
@@ -477,8 +540,18 @@ void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
             sprintf(outputValue, "%c,%d,%d,%d", matrixType, row, col, val);
             // printf("%s\t%s\n", outputKey, outputValue);
 
+            // add this key value to keysList
+            keysList[index * N + i].keyI = row;
+            keysList[index * N + i].keyJ = i;
+
+            keysList[index * N + i].name = matrixType;
+            keysList[index * N + i].i = row;
+            keysList[index * N + i].j = col;
+            keysList[index * N + i].value = val;
+
+
             // add this key value to hash map
-            insert(hash, outputKey, outputValue);
+            // insert(hash, outputKey, outputValue);
 
             // writing this to a file
             // writeStringsToFile(outputKey,outputValue);
@@ -496,12 +569,41 @@ void map(matrixIndex input, HashTable *hash, int sizeOfMatrix)
             sprintf(outputValue, "%c,%d,%d,%d", matrixType, row, col, val);
             // printf("%s\t%s\n", outputKey, outputValue);
 
+            // add this key value to keysList
+            keysList[index * N + i].keyI = i;
+            keysList[index * N + i].keyJ = col;
+
+            keysList[index * N + i].name = matrixType;
+            keysList[index * N + i].i = row;
+            keysList[index * N + i].j = col;
+            keysList[index * N + i].value = val;
+
             // add this key value to hash map
-            insert(hash, outputKey, outputValue);
+            // insert(hash, outputKey, outputValue);
 
             // writeStringsToFile(outputKey,outputValue);
             // writeKeysToFile(outputKey);     // key written here
             // writeValuesToFile(outputValue); // value written here
         }
     }
+}
+
+void reduce(matrixIndex* input, int inputSize, int index,int *resultant, int matrixSize)
+{
+    printf("Reducer %d\n", index);
+    
+    // int A[matrixSize];
+    // int B[matrixSize];
+    // int temp;
+    int i;
+    for(i=0;i<inputSize;i++)
+    {
+    }
+    // int sum = 0;
+    // for(i=0;i<inputSize;i++)
+    // {
+    //     sum += A[i] * B[i];
+    // }
+
+    // resultant[index] = sum;
 }
