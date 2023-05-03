@@ -165,6 +165,8 @@ void main(int argc, char *argv[])
         // WARNING: MAKE SURE the FILES ARE ALREADY CREATED AND HAVE CORRECT DATA
         read_matrix_indexWise(file1, file2, inputMatrixes, inputSize * 2);
 
+        printMatrix2D(inputMatrixes, inputSize * 2, sizeOfMatrix);
+
         // printMatrixIndexWise(inputMatrixes, inputSize * 2);
 
         inputSplit = 0;
@@ -328,36 +330,50 @@ void main(int argc, char *argv[])
         // print recieved data
         // printMatrixIndexWise(inputMatrixes, inputSize);
 
-        // result matrix
-        int *resultant = (int *)malloc(sizeof(int) * sizeOfMatrix * sizeOfMatrix);
-
-        // TODO: loop for processing here
-        // printf("Total input matrixes: %d\n", inputSize);
-        // printf("size of matrix: %d\n", sizeOfMatrix);
-        // printf("Values per Key: %d\n", sizeOfMatrix * sizeOfMatrix);
+        // loop for processing here
 
         // group by name
         int totalData = totalDataSize / sizeof(matrixIndex);
         int totalKeys = totalData / (sizeOfMatrix * 2);
+        
+        // result matrix
+        // :TODO: FIX THIS THE RESULTANT ARRAY SIZE NEEDS TO BE CALCULATED
+        int resultantSize = sqrt(totalKeys);
+        int *resultant = (int *)malloc(sizeof(int) * resultantSize * resultantSize);
 
-        for (int i = 0; i < totalKeys; i++)
-        {
-            // each key has size of sizeOfMatrix * 2
-            // multiply i and mid + i
-            // and sum them up
+        // iterate over the sorted elements
+        int i = 0;
+        while (i < totalData) {
+            // get the current key
+            int currentKeyI = inputMatrixes[i].keyI;
+            int currentKeyJ = inputMatrixes[i].keyJ;
+
+            // iterate over the next matrixSize * 2 elements
             int sum = 0;
-            for (int j = 0; j < sizeOfMatrix * 2; j++)
-            {
-                sum += inputMatrixes[i * (sizeOfMatrix * 2) + j].value * inputMatrixes[i * (sizeOfMatrix * 2) + sizeOfMatrix + j].value;
+            for (int j =0 ;  j < sizeOfMatrix; j++) {
+                // multiply A and B and add to sum
+                sum += inputMatrixes[i + j].value * inputMatrixes[i + j + sizeOfMatrix].value;
+                
+                // print Multiplication
+                // printf("%d * %d + ", inputMatrixes[i + j].value, inputMatrixes[i + j + sizeOfMatrix].value);
             }
-            resultant[i] = sum;
-        }
+            // print Sum
+            // printf(" = %d\n", sum);
 
-        for (int i = 0; i < sizeOfMatrix; i++)
+            // store the sum in the resultant matrix
+            // printf("Storing %d at %d, %d\n", sum, currentKeyI, currentKeyJ);
+            resultant[currentKeyI * resultantSize + currentKeyJ] = sum;
+
+            // increment i by matrixSize * 2
+            i += sizeOfMatrix * 2;
+        }        
+
+        printf("Resultant matrix: By Reducer : %d\n", reducerRankInReducerComm);
+        for (int i = 0; i < resultantSize; i++)
         {
-            for (int j = 0; j < sizeOfMatrix; j++)
+            for (int j = 0; j < resultantSize; j++)
             {
-                printf("%d ", resultant[i * sizeOfMatrix + j]);
+                printf("%d ", resultant[i * resultantSize + j]);
             }
             printf("\n");
         }
@@ -431,6 +447,30 @@ void printMatrixIndexWise(matrixIndex *matrix, long long int inputSize)
     {
         printf("%d,%d: %c %d,%d %d \n", matrix[i].keyI, matrix[i].keyJ, matrix[i].name, matrix[i].i, matrix[i].j, matrix[i].value);
         printf("\n");
+    }
+}
+void printMatrix2D(matrixIndex *matrix, int size, int sizeOfMatrix)
+{
+    int i, j;
+    printf("Matrix A\n");
+    for (i = 0; i < size; i++)
+    {
+        if (matrix[i].name == 'A')
+        {
+            printf("%d ", matrix[i].value);
+            if (matrix[i].j == sizeOfMatrix - 1)
+                printf("\n");
+        }
+    }
+    printf("Matrix B\n");
+    for (i = 0; i < size; i++)
+    {
+        if (matrix[i].name == 'B')
+        {
+            printf("%d ", matrix[i].value);
+            if (matrix[i].j == sizeOfMatrix - 1)
+                printf("\n");
+        }
     }
 }
 
