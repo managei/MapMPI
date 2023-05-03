@@ -213,21 +213,34 @@ void main(int argc, char *argv[])
         qsort(allKeys, mappers * sizeOfKeys, sizeof(matrixIndex), compareByKeys);
         printf("Sorted keys by Master\n");
 
+        // All Keys
+        // printMatrixIndexWise(allKeys, mappers * sizeOfKeys);
+
         // TODO: send data to reducers here use blocking send
         MPI_Barrier(MPI_COMM_WORLD); // Reducers completed processing
 
-        // printf("Total Keys: %d\n", mappers * sizeOfKeys);
-        // printf("Total Reducers: %d\n", reducers);
-        // printf("Total Keys per reducer: %d\n", mappers * sizeOfKeys / reducers);
         // All similar keys are together
         // So we can divide the keys equally among reducers
         // We can send the keys to reducers in round robin fashion
         
-        // for (int i = 0; i < reducers; i++)
-        // {
-        //     printf("Sending data to reducer %d\n", i + 1);
-        //     send_data_to_reducers(allKeys, i, mappers, reducers, sizeOfKeys);
-        // }
+        int reducerKeys = (sizeOfMatrix * sizeOfMatrix) / reducers;
+        int remainingKeys = (sizeOfMatrix * sizeOfMatrix) % reducers;
+
+        printf("Total Keys: %d\n", mappers * sizeOfKeys);
+        printf("Total Reducers: %d\n", reducers);
+        printf("Total Keys per reducer: %d\n", reducerKeys);
+        printf("Remaining Keys : %d\n", remainingKeys);
+        
+        for (int i = 0; i < reducers; i++)
+        {
+            printf("Sending data to reducer %d\n", i + 1);
+            if ( i == reducers-1  && remainingKeys != 0)
+                send_data_to_reducers(allKeys, i, mappers, reducers, (reducerKeys + remainingKeys) * (sizeOfMatrix + sizeOfMatrix));
+            else
+                send_data_to_reducers(allKeys, i, mappers, reducers, reducerKeys * (sizeOfMatrix + sizeOfMatrix));
+
+
+        }
     }
     else if (isMapper(rank, mappers)) // mapper node code
     {
@@ -317,7 +330,7 @@ void main(int argc, char *argv[])
         MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
         // print recieved data
-        // printMatrixIndexWise(inputMatrixes, inputSize);
+        printMatrixIndexWise(inputMatrixes, inputSize);
 
         // result matrix
         // int *resultant = (int *)malloc(sizeof(int) * sizeOfMatrix * sizeOfMatrix);
@@ -429,6 +442,9 @@ void send_data_to_reducers(matrixIndex *inputMatrixes, int inputSize, int mapper
 
         // compute data size
         int reducerDataSize = (reducerEndIndex - reducerStartIndex + 1) * sizeof(matrixIndex);
+        
+        printf("Reducer: %d, Start Index: %d, End Index: %d, Data Size: calc: %d, send: %d\n", reducerRank, reducerStartIndex, reducerEndIndex, sizeOfMatrix, reducerDataSize);
+
         // send data size
         MPI_Send(&reducerDataSize, 1, MPI_INT, reducerRank, 0, MPI_COMM_WORLD);
         // send data
