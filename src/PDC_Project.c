@@ -1,13 +1,15 @@
 // to compile:
 // mpicc PDC_Project.c -lm
-// to run: MAKE SURE TO CREATE 3 SIZE MATRIX FIRST
-// mpiexec -n 8 ./a.out 3
+// to run: MAKE SURE TO CREATE 3 SIZE MATRIX FIRST Name them matrixA, matrixB
+//  mpiexec -n 4 ./a.out 3 matrixA matrixB
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
+#include <sys/time.h>
 #include "hashmap.h"
 
 #define MAX_LINE_LEN 1024
@@ -58,6 +60,9 @@ void map(matrixIndex input, matrixIndex *keysList, int index, int sizeOfMatrix);
 // takes in input the matrix index
 // and returns resultant matrix
 void reduce(matrixIndex *input, int inputSize, int index, int *resultant, int matrixSize);
+
+// This method saves the resultant matrix to file
+void writeToReport(int proc, long long int sizeOfMatrix, double timeTaken, double Gflops);
 
 // ftn to calculate number of mappers and reducers
 // returns sizeOfMatrix, mappers, reducers, inputSplit, equalDivisionPossible, remainingSplit
@@ -135,8 +140,13 @@ void main(int argc, char *argv[])
     long long int inputSplit = 0;
     int remainingSplit = 0;
 
+    long long int operation_count = 0;
+    struct timeval start, end;
+
     if (isMaster(rank)) // master node
     {
+        gettimeofday(&start, NULL);
+
         printf("| --------------------Running PDC_Project--------------------\n");
         printf("| --------------------Master Initial Calculations Started--------------------\n");
 
@@ -158,7 +168,7 @@ void main(int argc, char *argv[])
         printf("| Power: %d\n", power);
         sizeOfMatrix = pow(2, power);
         printf("| Matrix Size: %d\n", sizeOfMatrix);
-
+        operation_count = sizeOfMatrix * sizeOfMatrix * sizeOfMatrix;
         // Read Matrix
         // append file name to path
         char path[] = "../datasets/";
@@ -261,7 +271,6 @@ void main(int argc, char *argv[])
                 send_data_to_reducers(allKeys, i + 1, mappers, reducers, reducerKeys * (sizeOfMatrix + sizeOfMatrix), reducerKeys * (sizeOfMatrix + sizeOfMatrix));
         }
 
-        MPI_Barrier(MPI_COMM_WORLD); // all reducers completed processing
         printf("| --------------------Reducers Keys Processing Done--------------------\n");
 
         // recieve data from reducers here use blocking recieve
@@ -275,9 +284,21 @@ void main(int argc, char *argv[])
                 recieve_data_from_reducers(resultant, i + 1, mappers, reducers, reducerKeys, reducerKeys);
         }
 
-        printf("| Resultant Matrix\n");
+        MPI_Barrier(MPI_COMM_WORLD); // all reducers completed processing
+        gettimeofday(&end, NULL);
+        double seconds = (end.tv_sec - start.tv_sec) +
+                         1.0e-6 * (end.tv_usec - start.tv_usec);
+        double Gflops = 2e-9 * operation_count / seconds;
+
         // printing only first 5 and last 5 elements of each row and columns - head and tail
+        printf("| Resultant Matrix\n");
         printMatrix2D(resultant, sizeOfMatrix);
+        printf("| --------------------GFLOPS REPORT--------------------\n");
+        printf("| Number of Operations %lld\n", operation_count);
+        printf("| Number of Seconds %f\n", seconds); // seconds are zero ???
+        printf("| Performance in Gflops %f Gflop/s\n", Gflops);
+
+        writeToReport(numberOfProcesses, sizeOfMatrix, seconds, Gflops);
     }
     else if (isMapper(rank, mappers)) // mapper node code
     {
@@ -412,10 +433,17 @@ void main(int argc, char *argv[])
 
         // send resultant array back to master
         MPI_Send(resultant, sizeof(int) * resultantSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-
         MPI_Barrier(MPI_COMM_WORLD); // all reducers has sent back data
     }
     MPI_Finalize(); // finalize MPI environment
+}
+
+void writeToReport(int proc, long long int sizeOfMatrix, double timeTaken, double Gflops)
+{
+    FILE *fp;
+    fp = fopen("../datasets/report.txt", "a+");
+    fprintf(fp, "%d,%lld,%f,%f\n", proc, sizeOfMatrix, timeTaken, Gflops);
+    fclose(fp);
 }
 // compare by keys
 int compareByKeys(const void *a, const void *b)
