@@ -11,7 +11,38 @@ To install the MapMPI, follow these steps:
 ## How to Run (TODO) 
 - Run the MapMPI on your cluster, specifying the input file and the number of map and reduce tasks: 
 
-`mpirun -np num`
+1. Copy Files to mirror folder
+2. Open terminal and run the following:
+
+`su - mpiuser`
+
+`cd /mirror/`
+
+`sudo chown -R mpiuser PDC_Project/`
+
+`sudo chown -R mpiuser PDC_Project`
+
+`sudo chmod 777 -R PDC_Project/`
+
+`sudo chmod 777 -R PDC_Project`
+
+`cd PDC_Project/src`
+
+`gcc createMatrix.c -o createMatrix -lm`
+
+`gcc serialMultiplication.c -o serialMultiplication -lm -std=c99`
+
+`mpicc PDC_Project.c -o PDC_Project -lm -std=c99`
+
+`./createMatrix 6`
+
+`./serialMultiplication 6 matrixA matrixB`
+
+`mpiexec -n 4 ./PDC_Project 6 matrixA matrixB`
+
+OR
+
+`mpiexec -n 8 -f mf ./PDC_Project 6 matrixA matrixB`
 
 ## Background
 
@@ -66,7 +97,7 @@ Master will then compare the matrix multiplication output with the output of ser
 
 A sample output for 8 processes has been attached below in Figure 2. Note that the ordering of processes in this output is consistent, it is possible that this order might be different. However, as should be evident through how Map Reduce works, no Reduce process should start before a Map process has finished its task.
 
-![image](https://user-images.githubusercontent.com/72218210/234863270-46222286-ec88-40e6-a3ab-5a8a01a797de.png)
+![Screenshot 2023-05-07 164120](https://user-images.githubusercontent.com/90345992/236675345-38641d45-d667-4ace-a8ac-b7503c5add29.png)
 
 # Credits (TODO)
 This project was developed by [Your Name] as part of [Your Project/Class Name]. Special thanks to [Your Instructor/Supervisor Name] for guidance and support.
