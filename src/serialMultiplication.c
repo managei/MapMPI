@@ -56,15 +56,18 @@ void printMatrix2D(int **matrix, int sizeOfMatrix)
 {
     for (int i = 0; i < sizeOfMatrix; i++)
     {
-        printf("| ");
-        for (int j = 0; j < sizeOfMatrix; j++)
+        if (i < 5 || i >= sizeOfMatrix - 5)
         {
-            if (j < 5 || j >= sizeOfMatrix - 5)
-                printf("%d ", matrix[i][j]);
-            else if (j == 5)
-                printf("... ");
+            printf("| ");
+            for (int j = 0; j < sizeOfMatrix; j++)
+            {
+                if (j < 5 || j >= sizeOfMatrix - 5)
+                    printf("%d ", matrix[i * sizeOfMatrix + j]);
+                else if (j == 5)
+                    printf("... ");
+            }
+            printf("\n");
         }
-        printf("\n");
         if (i == 5)
             printf("...\n");
     }
@@ -94,7 +97,24 @@ void writeToReport(int proc, long long int sizeOfMatrix, double timeTaken, doubl
     fprintf(fp, "%d,%lld,%f,%f\n", proc, sizeOfMatrix, timeTaken, Gflops);
     fclose(fp);
 }
+void write2DMatrix(char *fileName, int **matrix, int sizeOfMatrix)
+{
+    char path[] = "../datasets/";
+    char file[100];
+    sprintf(file, "%s%s.txt", path, fileName);
 
+    FILE *fp;
+    fp = fopen(file, "w+");
+    for (int i = 0; i < sizeOfMatrix; i++)
+    {
+        for (int j = 0; j < sizeOfMatrix; j++)
+        {
+            fprintf(fp, "%d ", matrix[i][j]);
+        }
+        fprintf(fp, "\n");
+    }
+    fclose(fp);
+}
 int main(int argc, char *argv[])
 {
 
@@ -169,6 +189,7 @@ int main(int argc, char *argv[])
     printf("| --------------------GFLOPS REPORT--------------------\n");
     printf("| Time taken to compute matrix C: %f Gflop/s.\n", Gflops1);
     writeToReport(1, sizeOfMatrix, seconds1, Gflops1);
+    write2DMatrix("matrixC_S", matC, sizeOfMatrix);
     return 0;
 
     // gettimeofday(&start, NULL); // starting point 1

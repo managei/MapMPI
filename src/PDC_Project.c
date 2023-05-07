@@ -1,5 +1,5 @@
 // to compile:
-// mpicc PDC_Project.c -lm
+// mpicc PDC_Project.c -lm -std=c99
 // to run: MAKE SURE TO CREATE 3 SIZE MATRIX FIRST Name them matrixA, matrixB
 //  mpiexec -n 4 ./a.out 3 matrixA matrixB
 
@@ -10,7 +10,6 @@
 #include <math.h>
 #include <time.h>
 #include <sys/time.h>
-#include "hashmap.h"
 
 #define MAX_LINE_LEN 1024
 #define MAX_LINES 100
@@ -26,6 +25,9 @@ typedef struct
     int value;
 } matrixIndex;
 
+// This method writes 2d matrix to file
+void write2DMatrix(char *fileName, int *matrix, int sizeOfMatrix);
+
 // This method changes the custom format matrix to 2d-matrix
 void read_matrix_indexWise(char *filename1, char *filename2, matrixIndex *matrix, int inputSize);
 
@@ -35,18 +37,9 @@ void printMatrixIndexWise(matrixIndex *matrix, long long int inputSize);
 // This method send data from master to mappers
 void send_data_to_mappers(matrixIndex *inputMatrixes, int inputSize, long long int inputSplit, int remainingSplit, int mappers);
 
-// This method recieve data from master to mappers
-long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
-
 // This method recieves data from mappers to Master
 // The data size is not being recieved properly
 void recieve_data_from_mappers(matrixIndex *allKeys, int mappers, int size);
-
-// This method sends data from mappers to Master
-void send_data_to_master(matrixIndex *inputMatrixes, long long int inputSize);
-
-// This method recieves data from Master to mapper (NOT BEING USED : Using inline code in mapper)
-long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize);
 
 // This method compares two matrixIndex struct
 int compareByKeys(const void *a, const void *b);
@@ -56,13 +49,11 @@ int compareByKeys(const void *a, const void *b);
 // and returns list of keys
 void map(matrixIndex input, matrixIndex *keysList, int index, int sizeOfMatrix);
 
-// This is reduce function for reducer
-// takes in input the matrix index
-// and returns resultant matrix
-void reduce(matrixIndex *input, int inputSize, int index, int *resultant, int matrixSize);
-
 // This method saves the resultant matrix to file
 void writeToReport(int proc, long long int sizeOfMatrix, double timeTaken, double Gflops);
+
+// This method Compare two matrixes and returns true if they are equal
+bool compareMatrixes(int *matrixA, int *matrixB, int sizeOfMatrix);
 
 // ftn to calculate number of mappers and reducers
 // returns sizeOfMatrix, mappers, reducers, inputSplit, equalDivisionPossible, remainingSplit
@@ -299,6 +290,38 @@ void main(int argc, char *argv[])
         printf("| Performance in Gflops %f Gflop/s\n", Gflops);
 
         writeToReport(numberOfProcesses, sizeOfMatrix, seconds, Gflops);
+
+        write2DMatrix("matrixC_P", resultant, sizeOfMatrix);
+
+        printf("| --------------------Comparing Parallel and Serial Results --------------------\n");
+        // compare with serial multiplication
+        // read matrix C from file
+        int *serialResultant = (int *)malloc(sizeof(int) * sizeOfMatrix * sizeOfMatrix);
+        char *path = "../datasets/matrixC_S.txt";
+        FILE *fp = fopen(path, "r");
+        if (fp == NULL)
+        {
+            printf("| Error opening file %s\n", path);
+            printf("| Please make sure you have created matrixC_S.txt\n");
+            printf("| Run serialMultiplication.c to create matrixC_S.txt\n");
+            printf("| Exiting...\n");
+            exit(1);
+        }
+
+        for (int i = 0; i < sizeOfMatrix; i++)
+        {
+            for (int j = 0; j < sizeOfMatrix; j++)
+            {
+                fscanf(fp, "%d", &serialResultant[i * sizeOfMatrix + j]);
+            }
+        }
+        fclose(fp);
+
+        // compare matrixes
+        bool isEqual = compareMatrixes(serialResultant, resultant, sizeOfMatrix);
+        printf("| Result of comparison: %s\n", isEqual ? "true" : "false");
+
+        printf("| --------------------Running PDC_Project Done--------------------\n");
     }
     else if (isMapper(rank, mappers)) // mapper node code
     {
@@ -414,7 +437,7 @@ void main(int argc, char *argv[])
             int currentKeyI = inputMatrixes[i].keyI;
             int currentKeyJ = inputMatrixes[i].keyJ;
 
-            // iterate over the next matrixSize * 2 elements
+            // iterate over the next matrixSize elements
             int sum = 0;
             for (int j = 0; j < sizeOfMatrix; j++)
             {
@@ -467,6 +490,36 @@ int compareByKeys(const void *a, const void *b)
     }
 }
 
+bool compareMatrixes(int *matrixA, int *matrixB, int sizeOfMatrix)
+{
+    for (int i = 0; i < sizeOfMatrix; i++)
+    {
+        for (int j = 0; j < sizeOfMatrix; j++)
+        {
+            if (matrixA[i * sizeOfMatrix + j] != matrixB[i * sizeOfMatrix + j])
+                return false;
+        }
+    }
+    return true;
+}
+
+void write2DMatrix(char *fileName, int *matrix, int sizeOfMatrix)
+{
+    char path[] = "../datasets/";
+    char file[100];
+    sprintf(file, "%s%s.txt", path, fileName);
+
+    FILE *fp;
+    fp = fopen(file, "w+");
+    for (int i = 0; i < sizeOfMatrix; i++)
+    {
+        for (int j = 0; j < sizeOfMatrix; j++)
+        {
+            fprintf(fp, "%d ", matrix[i * sizeOfMatrix + j]);
+        }
+        fprintf(fp, "\n");
+    }
+}
 void read_matrix_indexWise(char *filename1, char *filename2, matrixIndex *matrix, int inputSize)
 {
 
@@ -517,15 +570,18 @@ void printMatrix2D(int *matrix, int sizeOfMatrix)
 {
     for (int i = 0; i < sizeOfMatrix; i++)
     {
-        printf("| ");
-        for (int j = 0; j < sizeOfMatrix; j++)
+        if (i < 5 || i >= sizeOfMatrix - 5)
         {
-            if (j < 5 || j >= sizeOfMatrix - 5)
-                printf("%d ", matrix[i * sizeOfMatrix + j]);
-            else if (j == 5)
-                printf("... ");
+            printf("| ");
+            for (int j = 0; j < sizeOfMatrix; j++)
+            {
+                if (j < 5 || j >= sizeOfMatrix - 5)
+                    printf("%d ", matrix[i * sizeOfMatrix + j]);
+                else if (j == 5)
+                    printf("... ");
+            }
+            printf("\n");
         }
-        printf("\n");
         if (i == 5)
             printf("...\n");
     }
@@ -614,33 +670,6 @@ void recieve_data_from_reducers(int *resultant, int i, int mappers, int reducers
 
     // send data size
     MPI_Recv(resultant + reducerStartIndex, reducerDataSize, MPI_BYTE, reducerRank, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-}
-void send_data_to_master(matrixIndex *inputMatrixes, long long int inputSize)
-{
-    int totalDataSize = inputSize * sizeof(matrixIndex);
-    // send data
-    MPI_Send(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD);
-}
-
-long long int recieve_data_from_master(matrixIndex *inputMatrixes, long long int inputSize)
-{
-
-    int totalDataSize = 0;
-    // wait for data Size from master
-    MPI_Recv(&totalDataSize, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    inputSize = totalDataSize / sizeof(matrixIndex);
-
-    // Allocate memory for input matrixes
-    inputMatrixes = (matrixIndex *)malloc(totalDataSize);
-
-    // wait for data from master
-    MPI_Recv(inputMatrixes, totalDataSize, MPI_BYTE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    // printf("Recieved data from master\n");
-    // printf("Data Size %d\n", totalDataSize);
-
-    return inputSize;
 }
 
 void map(matrixIndex input, matrixIndex *keysList, int index, int sizeOfMatrix)
